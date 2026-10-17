@@ -1,0 +1,24 @@
+{
+  "categories": [
+    "Software & Subscriptions",
+    "Office Supplies",
+    "Equipment & Hardware",
+    "Travel",
+    "Meals & Entertainment",
+    "Internet & Phone",
+    "Professional Services",
+    "Marketing & Advertising",
+    "Education & Training",
+    "Rent & Utilities",
+    "Bank & Payment Fees",
+    "Other"
+  ],
+  "vendor_rules": {
+    "figma": "Software & Subscriptions",
+    "adobe": "Software & Subscriptions",
+    "github": "Software & Subscriptions",
+    "uber": "Travel",
+    "airtel": "Internet & Phone",
+    "stripe": "Bank & Payment Fees"
+  }
+}

@@ -1,0 +1,15 @@
+[
+  {
+    "note": "Add your own corrected examples here. They are shown to the model as few-shot guidance.",
+    "output": {
+      "vendor": "Figma",
+      "date": "2026-03-04",
+      "total": 15.0,
+      "tax": 0.0,
+      "currency": "USD",
+      "category": "Software & Subscriptions",
+      "document_type": "invoice",
+      "confidence": 0.95
+    }
+  }
+]
