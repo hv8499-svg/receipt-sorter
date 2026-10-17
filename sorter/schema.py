@@ -18,8 +18,10 @@ def build_schema(categories):
             "category": {"type": "string", "enum": categories},
             "document_type": {"type": "string", "enum": DOC_TYPES},
             "confidence": {"type": "number", "description": "0 to 1"},
+            "date_text": {"type": "string", "description": "the date exactly as printed"},
+            "total_text": {"type": "string", "description": "the total exactly as printed"},
         },
-        "required": ["vendor", "date", "total", "category"],
+        "required": ["vendor", "date", "total", "category", "date_text", "total_text"],
     }
 
 
@@ -88,6 +90,21 @@ def normalize(raw, categories, vendor_rules=None):
     tax = money(raw.get("tax"))
     if tax is not None and total is not None and tax > total:
         issues.append("tax exceeds total")
+
+    # evidence check: the model must quote the date/total as printed; flag doubt or mismatch
+    for label, shown, parsed, parse in (("date", raw.get("date_text"), date, iso_date),
+                                        ("total", raw.get("total_text"), total, money)):
+        shown = str(shown or "").strip()
+        if not shown:
+            continue
+        if "?" in shown or re.search(r"illegible|unclear|unreadable|blur", shown, re.I):
+            issues.append(f"{label} text unclear ('{shown}')")
+        else:
+            seen = parse(shown)
+            if seen is None:
+                issues.append(f"{label} text not parseable ('{shown}')")
+            elif parsed is not None and seen != parsed:
+                issues.append(f"{label} text disagrees ('{shown}' vs {parsed})")
 
     category = raw.get("category")
     if category not in categories:

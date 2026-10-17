@@ -78,3 +78,37 @@ def test_dry_run_writes_nothing(tmp_path):
     (inp / "a.png").write_bytes(b"x")
     process_folder(inp, out, FakeModel([good()]), CONFIG, [], dry_run=True, log=lambda *_: None)
     assert not out.exists()
+
+
+def test_evidence_flags_unclear_and_mismatch(tmp_path):
+    inp, out = tmp_path / "in", tmp_path / "out"
+    inp.mkdir()
+    (inp / "a.png").write_bytes(b"a")
+    (inp / "b.png").write_bytes(b"b")
+    (inp / "c.png").write_bytes(b"c")
+    model = FakeModel([
+        good(date_text="1?/09/2026", total_text="Rs 3?5.00"),   # the blurry-receipt case
+        good(vendor="X", total_text="Rs 99.00"),                  # claims 15, text says 99
+        good(vendor="Y", date_text="March 4, 2026", total_text="$15.00"),  # consistent: no flag
+    ])
+    rows = {r["original_name"]: r for r in process_folder(inp, out, model, CONFIG, [], log=lambda *_: None)}
+    assert "date text unclear" in rows["a.png"]["notes"] and "total text unclear" in rows["a.png"]["notes"]
+    assert rows["a.png"]["needs_review"] == "yes"
+    assert "total text disagrees" in rows["b.png"]["notes"]
+    assert rows["c.png"]["needs_review"] == ""
+
+
+def test_verify_pass_flags_disagreement(tmp_path):
+    inp, out = tmp_path / "in", tmp_path / "out"
+    inp.mkdir()
+    (inp / "a.png").write_bytes(b"a")
+    (inp / "b.png").write_bytes(b"b")
+    model = FakeModel([
+        good(vendor="A", date="2026-09-17", total=375), good(vendor="A", date="2026-09-11", total=315),  # a: reads differ
+        good(vendor="B"), good(vendor="B"),                                                              # b: reads agree
+    ])
+    rows = {r["original_name"]: r for r in
+            process_folder(inp, out, model, CONFIG, [], log=lambda *_: None, verify=True)}
+    assert "verification pass disagreed on date and total" in rows["a.png"]["notes"]
+    assert rows["b.png"]["needs_review"] == ""
+    assert model.calls == 4

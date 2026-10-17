@@ -7,12 +7,12 @@ MAX_SIDE = 1600
 MAX_PDF_PAGES = 2
 
 
-def _shrink(data):
+def _shrink(data, max_side=MAX_SIDE):
     try:
         from PIL import Image, ImageOps
         img = ImageOps.exif_transpose(Image.open(io.BytesIO(data)))
         img = img.convert("RGB")
-        img.thumbnail((MAX_SIDE, MAX_SIDE))
+        img.thumbnail((max_side, max_side))
         buf = io.BytesIO()
         img.save(buf, "JPEG", quality=88)
         return buf.getvalue()
@@ -20,15 +20,15 @@ def _shrink(data):
         return data  # let the model try the raw bytes
 
 
-def load_images(path):
+def load_images(path, max_side=MAX_SIDE):
     path = Path(path)
     if path.suffix.lower() == ".pdf":
         import fitz  # pymupdf
         out = []
         with fitz.open(path) as doc:
             for page in list(doc)[:MAX_PDF_PAGES]:
-                out.append(_shrink(page.get_pixmap(dpi=150).tobytes("png")))
+                out.append(_shrink(page.get_pixmap(dpi=150).tobytes("png"), max_side))
         if not out:
             raise ValueError("empty PDF")
         return out
-    return [_shrink(path.read_bytes())]
+    return [_shrink(path.read_bytes(), max_side)]

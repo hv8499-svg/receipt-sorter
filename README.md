@@ -27,6 +27,9 @@ python -m sorter ~/Documents/receipts -o ~/Documents/receipts_sorted
 python -m sorter ./receipts --model gemma3:4b --dry-run   # preview, writes nothing
 ```
 
+Add `--verify` to read every document twice (second pass at a different resolution) and flag any
+disagreement on date or total. About 2x slower; recommended for blurry phone photos.
+
 ## Make it yours (the part a closed API can't give you)
 
 - `categories.json`: your own tax categories, plus `vendor_rules` that always override the model.
@@ -36,6 +39,7 @@ python -m sorter ./receipts --model gemma3:4b --dry-run   # preview, writes noth
 ## How it stays reliable with a small model
 
 1. Constrained JSON output (Ollama `format` schema) plus tolerant parsing, with up to 2 retries.
+   The model must also quote the date and total exactly as printed; unclear or mismatching quotes are flagged.
 2. Validation: dates normalized, `1.234,50` / `₹1,234.50` parsed, tax > total flagged, unknown categories caught.
 3. Nothing is silently trusted: low confidence, missing fields and possible duplicates go to `needs_review/`.
 4. Exact duplicates (SHA-256) are skipped without spending any inference.

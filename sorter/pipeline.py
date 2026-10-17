@@ -21,7 +21,8 @@ def build_prompt(categories, examples):
         "Fields: vendor (merchant name, not the customer), date (YYYY-MM-DD, the document date), "
         "total (final amount paid, number only), tax (tax portion, 0 if none), currency (ISO code), "
         f"category (exactly one of: {', '.join(categories)}), "
-        "document_type (receipt, invoice or other), confidence (0 to 1, your certainty).\n"
+        "document_type (receipt, invoice or other), confidence (0 to 1, your certainty), "
+        "date_text and total_text (copy the date and total EXACTLY as printed; write ? for any character you cannot read).\n"
         "Never invent values. If something is unreadable, use an empty string and lower confidence.\n"
         + (f"Examples of good output:\n{shots}\n" if shots else "")
     )
@@ -48,8 +49,7 @@ def _unique(dest_dir, name):
     return candidate
 
 
-def extract_one(path, client, categories, vendor_rules, examples, retries=2):
-    images = load_images(path)
+def _read(images, client, categories, vendor_rules, examples, retries):
     prompt = build_prompt(categories, examples)
     schema = build_schema(categories)
     last_err = None
@@ -62,7 +62,21 @@ def extract_one(path, client, categories, vendor_rules, examples, retries=2):
     raise ValueError(f"model returned unusable output: {last_err}")
 
 
-def process_folder(inp, out, client, config, examples, dry_run=False, log=print):
+def extract_one(path, client, categories, vendor_rules, examples, retries=2, verify=False):
+    rec, issues = _read(load_images(path), client, categories, vendor_rules, examples, retries)
+    if verify:
+        # second read at a different resolution; a model that is guessing rarely guesses the same twice
+        try:
+            rec2, _ = _read(load_images(path, max_side=1000), client, categories, vendor_rules, examples, retries)
+            diffs = [f for f in ("date", "total") if rec[f] != rec2[f]]
+            if diffs:
+                issues.append("verification pass disagreed on " + " and ".join(diffs))
+        except ValueError:
+            issues.append("verification pass failed")
+    return rec, issues
+
+
+def process_folder(inp, out, client, config, examples, dry_run=False, log=print, verify=False):
     inp, out = Path(inp), Path(out)
     categories, rules = config["categories"], config.get("vendor_rules", {})
     files = sorted(p for p in inp.rglob("*")
@@ -82,7 +96,7 @@ def process_folder(inp, out, client, config, examples, dry_run=False, log=print)
             continue
         seen_hash[digest] = path.name
         try:
-            rec, issues = extract_one(path, client, categories, rules, examples)
+            rec, issues = extract_one(path, client, categories, rules, examples, verify=verify)
         except Exception as e:
             rows.append(_row(path, "", {}, [str(e)], True))
             log(f"   FAILED: {e}")
